@@ -12,7 +12,7 @@
     
     <div class="card shadow">
         <div class="card-body text-center">
-            <img id="viewAvatar" src="" class="rounded-circle mb-3" style="width: 150px; height: 150px; object-fit: cover;">
+            <img id="viewAvatar" src="https://cdn-icons-png.flaticon.com/512/149/149071.png" class="rounded-circle mb-3" style="width: 150px; height: 150px; object-fit: cover;">
             <h2 id="viewUsername">Ładowanie...</h2>
             <p id="viewBio" class="text-muted"></p>
             <hr>
@@ -45,7 +45,7 @@
     const db = supabase.createClient(dbUrl, dbKey);
 
     const urlParams = new URLSearchParams(window.location.search);
-    const targetUserId = urlParams.get('id'); // ID пользователя, чей профиль смотрим
+    const targetUserId = urlParams.get('id');
 
     async function loadProfile() {
         const { data: { user } } = await db.auth.getUser();
@@ -56,14 +56,27 @@
         const { data: profile } = await db.from('profiles').select('*').eq('id', idToLoad).single();
 
         if (profile) {
+            // Отображение данных
             document.getElementById('viewUsername').innerText = profile.username || 'Użytkownik';
             document.getElementById('viewAge').innerText = profile.age || '-';
             document.getElementById('viewCity').innerText = profile.city_country || '-';
             document.getElementById('viewFav').innerText = profile.favorite_book || '-';
             document.getElementById('viewBio').innerText = profile.bio || '';
-            document.getElementById('viewAvatar').src = profile.avatar_url;
+            if (profile.avatar_url) document.getElementById('viewAvatar').src = profile.avatar_url;
+
+            // Заполнение полей ввода (если это мой профиль)
+            if (user && user.id === idToLoad) {
+                document.getElementById('inUsername').value = profile.username || '';
+                document.getElementById('inAge').value = profile.age || '';
+                document.getElementById('inCity').value = profile.city_country || '';
+                document.getElementById('inFav').value = profile.favorite_book || '';
+                document.getElementById('inBio').value = profile.bio || '';
+            }
+        } else {
+             document.getElementById('viewUsername').innerText = 'Nowy Profil';
         }
 
+        // Логика видимости кнопок
         if (user && user.id === idToLoad) {
             document.getElementById('editSection').style.display = 'block';
         } else if (user) {
@@ -84,8 +97,12 @@
         };
 
         const { error } = await db.from('profiles').upsert(updates);
-        if (error) alert(error.message);
-        else window.location.reload();
+        if (error) {
+            alert("Błąd: " + error.message);
+        } else {
+            alert("Zapisano pomyślnie!");
+            window.location.reload();
+        }
     }
 
     loadProfile();
