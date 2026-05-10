@@ -36,11 +36,11 @@
 </div>
 
 <script>
-    const supabaseUrl = 'https://ekfjvbncqmoioxmfbrer.supabase.co';
-    const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVrZmp2Ym5jcW1vaW94bWZicmVyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg0MDA4NjQsImV4cCI6MjA5Mzk3Njg2NH0.JHSrgWWkenp8rg2di9TmvIp46XuOASWPs8Gx1rC52Zs';
-    const supabase = supabase.createClient(supabaseUrl, supabaseKey);
+    // Изменил названия переменных, чтобы 100% избежать ошибок
+    const dbUrl = 'https://ekfjvbncqmoioxmfbrer.supabase.co';
+    const dbKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVrZmp2Ym5jcW1vaW94bWZicmVyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg0MDA4NjQsImV4cCI6MjA5Mzk3Njg2NH0.JHSrgWWkenp8rg2di9TmvIp46XuOASWPs8Gx1rC52Zs';
+    const db = supabase.createClient(dbUrl, dbKey);
 
-    // Получаем ID книги из URL (например, details.html?id=5)
     const urlParams = new URLSearchParams(window.location.search);
     const bookId = urlParams.get('id');
 
@@ -52,7 +52,7 @@
     }
 
     async function loadBookDetails() {
-        const { data, error } = await supabase.from('books').select('*').eq('id', bookId).single();
+        const { data, error } = await db.from('books').select('*').eq('id', bookId).single();
         if (data) {
             document.getElementById('bookTitle').innerText = data.title;
             document.getElementById('bookAuthor').innerText = data.author;
@@ -60,7 +60,7 @@
     }
 
     async function loadComments() {
-        const { data, error } = await supabase.from('comments').select('*').eq('book_id', bookId).order('created_at', { ascending: false });
+        const { data, error } = await db.from('comments').select('*').eq('book_id', bookId).order('created_at', { ascending: false });
         const container = document.getElementById('commentsContainer');
         container.innerHTML = '';
 
@@ -80,12 +80,13 @@
         const text = document.getElementById('commentInput').value.trim();
         if (!text) return alert('Wpisz komentarz!');
 
-        const { error } = await supabase.from('comments').insert([{ book_id: bookId, text: text }]);
+        const { error } = await db.from('comments').insert([{ book_id: bookId, text: text }]);
         if (!error) {
             document.getElementById('commentInput').value = '';
             loadComments();
         } else {
-            alert('Wystąpił błąd.');
+            alert('Wystąpił błąd. Sprawdź konsolę (F12).');
+            console.error(error);
         }
     }
 </script>
