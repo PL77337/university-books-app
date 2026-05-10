@@ -21,7 +21,7 @@
             <h5 class="card-title">Dodaj nową książkę</h5>
             <div class="row g-3">
                 <div class="col-md-5">
-                    <input type="text" id="titleInput" class="form-control" placeholder="Tytuł książki" required>
+                    <input type="text" id="titleInput" class="form-control" placeholder="Tytuł książки" required>
                 </div>
                 <div class="col-md-5">
                     <input type="text" id="authorInput" class="form-control" placeholder="Autor" required>
@@ -48,7 +48,6 @@
     const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVrZmp2Ym5jcW1vaW94bWZicmVyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg0MDA4NjQsImV4cCI6MjA5Mzk3Njg2NH0.JHSrgWWkenp8rg2di9TmvIp46XuOASWPs8Gx1rC52Zs';
     const db = supabase.createClient(supabaseUrl, supabaseKey);
 
-    // Функция проверки пользователя
     async function checkUser() {
         const { data: { user } } = await db.auth.getUser();
         const authArea = document.getElementById('authArea');
@@ -56,6 +55,7 @@
         
         if (user) {
             authArea.innerHTML = `
+                <a href="search.html" class="btn btn-sm btn-outline-primary me-2">🔍 Szukaj znajomych</a>
                 <a href="profile.html" class="btn btn-sm btn-info me-2 text-white">Mój Profil</a>
                 <span class="me-2 text-dark"><strong>${user.email}</strong></span>
                 <button onclick="logout()" class="btn btn-sm btn-outline-danger">Wyloguj</button>
@@ -78,8 +78,12 @@
 
     async function fetchBooks() {
         const user = await checkUser();
-        // Загружаем книги и пытаемся сопоставить их с профилями (если добавим user_id в таблицу books)
-        const { data, error } = await db.from('books').select('*').order('created_at', { ascending: false });
+        // Запрашиваем книги вместе с данными профиля автора
+        const { data, error } = await db
+            .from('books')
+            .select(`*, profiles(username, avatar_url)`)
+            .order('created_at', { ascending: false });
+
         const container = document.getElementById('booksContainer');
         container.innerHTML = ''; 
 
@@ -88,21 +92,21 @@
             return; 
         }
         
-        if (data.length === 0) { 
-            container.innerHTML = '<li class="list-group-item">Brak książek w bazie.</li>'; 
-            return; 
-        }
-
         data.forEach(book => {
             const li = document.createElement('li');
-            li.className = 'list-group-item d-flex justify-content-between align-items-center';
+            li.className = 'list-group-item d-flex justify-content-between align-items-center py-3';
             
-            const deleteBtn = user ? `<button onclick="deleteBook(${book.id})" class="btn btn-sm btn-outline-danger">Usuń</button>` : '';
+            const deleteBtn = (user && user.id === book.user_id) ? `<button onclick="deleteBook(${book.id})" class="btn btn-sm btn-outline-danger">Usuń</button>` : '';
+
+            // Если книга привязана к пользователю, показываем его аватарку и имя
+            const authorName = book.profiles?.username || book.author;
+            const authorAvatar = book.profiles?.avatar_url || 'https://cdn-icons-png.flaticon.com/512/149/149071.png';
+            const profileLink = book.user_id ? `<a href="profile.html?id=${book.user_id}"><img src="${authorAvatar}" class="rounded-circle me-2" style="width: 30px; height: 30px; object-fit: cover;"> ${authorName}</a>` : authorName;
 
             li.innerHTML = `
                 <div>
                     <strong>${book.title}</strong> 
-                    <span class="text-muted ms-2">autor: ${book.author}</span>
+                    <span class="text-muted ms-2">dodał: ${profileLink}</span>
                 </div>
                 <div>
                     <a href="details.html?id=${book.id}" class="btn btn-sm btn-outline-info me-2">Szczegóły</a>
@@ -114,21 +118,25 @@
     }
 
     async function addBook() {
-        const user = await checkUser();
-        if (!user) return alert('Musisz быть zalogowany!');
+        const { data: { user } } = await db.auth.getUser();
+        if (!user) return alert('Musisz być zalogowany!');
 
         const title = document.getElementById('titleInput').value.trim();
         const author = document.getElementById('authorInput').value.trim();
-        if (!title || !author) return alert('Wypełnij pola!');
+        
+        // Привязываем книгу к текущему пользователю
+        const { error } = await db.from('books').insert([{ 
+            title, 
+            author, 
+            user_id: user.id 
+        }]);
 
-        // Добавляем книгу. Позже можно добавить user_id: user.id для связи с профилем
-        const { error } = await db.from('books').insert([{ title, author }]);
         if (!error) {
             document.getElementById('titleInput').value = '';
             document.getElementById('authorInput').value = '';
             fetchBooks();
         } else {
-            alert('Błąd dodawania.');
+            alert('Błąd dodawania: ' + error.message);
         }
     }
 

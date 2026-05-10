@@ -23,20 +23,20 @@
         <div class="card-body">
             <h4>Opinie i komentarze</h4>
             
-            <div class="mb-3 d-flex mt-3">
+            <div id="commentForm" class="mb-3 d-flex mt-3">
                 <input type="text" id="commentInput" class="form-control me-2" placeholder="Napisz swoją opinię..." required>
                 <button onclick="addComment()" class="btn btn-success">Dodaj</button>
             </div>
+            <p id="loginWarning" class="text-muted" style="display:none;">Zaloguj się, aby dodać komentarz.</p>
 
-            <ul id="commentsContainer" class="list-group list-group-flush mt-4">
-                <li class="list-group-item text-muted">Ładowanie komentarzy...</li>
-            </ul>
+            <div id="commentsContainer" class="mt-4">
+                <p class="text-muted">Ładowanie komentarzy...</p>
+            </div>
         </div>
     </div>
 </div>
 
 <script>
-    // Изменил названия переменных, чтобы 100% избежать ошибок
     const dbUrl = 'https://ekfjvbncqmoioxmfbrer.supabase.co';
     const dbKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVrZmp2Ym5jcW1vaW94bWZicmVyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg0MDA4NjQsImV4cCI6MjA5Mzk3Njg2NH0.JHSrgWWkenp8rg2di9TmvIp46XuOASWPs8Gx1rC52Zs';
     const db = supabase.createClient(dbUrl, dbKey);
@@ -45,48 +45,90 @@
     const bookId = urlParams.get('id');
 
     if (!bookId) {
-        document.body.innerHTML = '<div class="container mt-5"><h3>Błąd: Nie wybrano książki. <a href="index.html">Powrót</a></h3></div>';
+        window.location.href = 'index.html';
     } else {
+        checkAuth();
         loadBookDetails();
-        loadComments();
+        fetchComments();
+    }
+
+    async function checkAuth() {
+        const { data: { user } } = await db.auth.getUser();
+        if (!user) {
+            document.getElementById('commentForm').style.display = 'none';
+            document.getElementById('loginWarning').style.display = 'block';
+        }
     }
 
     async function loadBookDetails() {
-        const { data, error } = await db.from('books').select('*').eq('id', bookId).single();
+        const { data } = await db.from('books').select('*').eq('id', bookId).single();
         if (data) {
             document.getElementById('bookTitle').innerText = data.title;
             document.getElementById('bookAuthor').innerText = data.author;
         }
     }
 
-    async function loadComments() {
-        const { data, error } = await db.from('comments').select('*').eq('book_id', bookId).order('created_at', { ascending: false });
+    async function fetchComments() {
+        // Запрашиваем комментарии и данные из таблицы profiles одновременно
+        const { data, error } = await db
+            .from('comments')
+            .select(`
+                text, 
+                user_id,
+                profiles (username, avatar_url)
+            `)
+            .eq('book_id', bookId)
+            .order('created_at', { ascending: false });
+
         const container = document.getElementById('commentsContainer');
         container.innerHTML = '';
 
         if (data && data.length > 0) {
-            data.forEach(comment => {
-                const li = document.createElement('li');
-                li.className = 'list-group-item';
-                li.innerText = comment.text;
-                container.appendChild(li);
+            data.forEach(c => {
+                const div = document.createElement('div');
+                div.className = 'd-flex mb-3 p-3 bg-white shadow-sm rounded align-items-center';
+                
+                // Данные автора
+                const avatar = c.profiles?.avatar_url || 'https://cdn-icons-png.flaticon.com/512/149/149071.png';
+                const name = c.profiles?.username || 'Użytkownik';
+                const profileLink = `profile.html?id=${c.user_id}`;
+
+                div.innerHTML = `
+                    <a href="${profileLink}">
+                        <img src="${avatar}" class="rounded-circle me-3" style="width: 50px; height: 50px; object-fit: cover; border: 2px solid #eee;">
+                    </a>
+                    <div>
+                        <a href="${profileLink}" class="text-decoration-none fw-bold text-primary">${name}</a>
+                        <p class="mb-0 text-dark">${c.text}</p>
+                    </div>
+                `;
+                container.appendChild(div);
             });
         } else {
-            container.innerHTML = '<li class="list-group-item">Brak opinii. Bądź pierwszy!</li>';
+            container.innerHTML = '<p class="text-muted text-center py-3">Brak opinii. Bądź pierwszy!</p>';
         }
     }
 
     async function addComment() {
+        const { data: { user } } = await db.auth.getUser();
+        if (!user) return alert('Musisz być zalogowany!');
+
         const text = document.getElementById('commentInput').value.trim();
         if (!text) return alert('Wpisz komentarz!');
 
-        const { error } = await db.from('comments').insert([{ book_id: bookId, text: text }]);
+        // Сохраняем комментарий с ID текущего пользователя
+        const { error } = await db.from('comments').insert([{ 
+            book_id: bookId, 
+            text: text, 
+            user_id: user.id 
+        }]);
+
         if (!error) {
             document.getElementById('commentInput').value = '';
-            loadComments();
+            fetchComments(); // Перезагружаем список
         } else {
-            alert('Wystąpił błąd. Sprawdź konsolę (F12).');
             console.error(error);
+            alert('Błąd dodawania komentarza.');
         }
     }
 </script>
