@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <title>Czat</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+<div class="container mt-5">
+    <div class="card shadow">
+        <div class="card-header bg-primary text-white d-flex justify-content-between">
+            <span>Czat</span>
+            <a href="index.html" class="text-white">Zamknij</a>
+        </div>
+        <div id="messages" class="card-body" style="height: 400px; overflow-y: auto;"></div>
+        <div class="card-footer d-flex">
+            <input type="text" id="msgInput" class="form-control me-2" placeholder="Napisz...">
+            <button onclick="sendMsg()" class="btn btn-primary">Wyślij</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const dbUrl = 'https://ekfjvbncqmoioxmfbrer.supabase.co';
+    const dbKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVrZmp2Ym5jcW1vaW94bWZicmVyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg0MDA4NjQsImV4cCI6MjA5Mzk3Njg2NH0.JHSrgWWkenp8rg2di9TmvIp46XuOASWPs8Gx1rC52Zs';
+    const db = supabase.createClient(dbUrl, dbKey);
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const receiverId = urlParams.get('to');
+
+    async function loadMessages() {
+        const { data: { user } } = await db.auth.getUser();
+        const { data: msgs } = await db.from('messages')
+            .select('*')
+            .or(`and(sender_id.eq.${user.id},receiver_id.eq.${receiverId}),and(sender_id.eq.${receiverId},receiver_id.eq.${user.id})`)
+            .order('created_at', { ascending: true });
+
+        const div = document.getElementById('messages');
+        div.innerHTML = msgs.map(m => `
+            <div class="mb-2 ${m.sender_id === user.id ? 'text-end' : ''}">
+                <span class="badge ${m.sender_id === user.id ? 'bg-primary' : 'bg-secondary'}">${m.content}</span>
+            </div>
+        `).join('');
+        div.scrollTop = div.scrollHeight;
+    }
+
+    async function sendMsg() {
+        const { data: { user } } = await db.auth.getUser();
+        const content = document.getElementById('msgInput').value;
+        await db.from('messages').insert([{ sender_id: user.id, receiver_id: receiverId, content }]);
+        document.getElementById('msgInput').value = '';
+        loadMessages();
+    }
+
+    setInterval(loadMessages, 3000); // Обновление чата каждые 3 сек
+</script>
+</body>
+</html>

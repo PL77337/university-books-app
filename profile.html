@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <title>Profil Użytkownika</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+<div class="container mt-5">
+    <a href="index.html" class="btn btn-secondary mb-3">Powrót</a>
+    
+    <div class="card shadow">
+        <div class="card-body text-center">
+            <img id="viewAvatar" src="" class="rounded-circle mb-3" style="width: 150px; height: 150px; object-fit: cover;">
+            <h2 id="viewUsername">Ładowanie...</h2>
+            <p id="viewBio" class="text-muted"></p>
+            <hr>
+            <div class="text-start">
+                <p><strong>Wiek:</strong> <span id="viewAge"></span></p>
+                <p><strong>Miasto/Kraj:</strong> <span id="viewCity"></span></p>
+                <p><strong>Ulubiona książka:</strong> <span id="viewFav"></span></p>
+            </div>
+
+            <div id="editSection" style="display: none;" class="mt-4 border-top pt-3 text-start">
+                <h5>Edytuj profil</h5>
+                <input type="text" id="inUsername" class="form-control mb-2" placeholder="Nazwa użytkownika">
+                <input type="number" id="inAge" class="form-control mb-2" placeholder="Wiek">
+                <input type="text" id="inCity" class="form-control mb-2" placeholder="Miasto/Kraj">
+                <input type="text" id="inFav" class="form-control mb-2" placeholder="Ulubiona książka">
+                <textarea id="inBio" class="form-control mb-2" placeholder="O sobie"></textarea>
+                <button onclick="saveProfile()" class="btn btn-success w-100">Zapisz zmiany</button>
+            </div>
+
+            <div id="chatSection" style="display: none;" class="mt-4">
+                <a id="chatLink" href="#" class="btn btn-primary w-100">Wyślij wiadomość</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const dbUrl = 'https://ekfjvbncqmoioxmfbrer.supabase.co';
+    const dbKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVrZmp2Ym5jcW1vaW94bWZicmVyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg0MDA4NjQsImV4cCI6MjA5Mzk3Njg2NH0.JHSrgWWkenp8rg2di9TmvIp46XuOASWPs8Gx1rC52Zs';
+    const db = supabase.createClient(dbUrl, dbKey);
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const targetUserId = urlParams.get('id'); // ID пользователя, чей профиль смотрим
+
+    async function loadProfile() {
+        const { data: { user } } = await db.auth.getUser();
+        const idToLoad = targetUserId || user?.id;
+
+        if (!idToLoad) return window.location.href = 'auth.html';
+
+        const { data: profile } = await db.from('profiles').select('*').eq('id', idToLoad).single();
+
+        if (profile) {
+            document.getElementById('viewUsername').innerText = profile.username || 'Użytkownik';
+            document.getElementById('viewAge').innerText = profile.age || '-';
+            document.getElementById('viewCity').innerText = profile.city_country || '-';
+            document.getElementById('viewFav').innerText = profile.favorite_book || '-';
+            document.getElementById('viewBio').innerText = profile.bio || '';
+            document.getElementById('viewAvatar').src = profile.avatar_url;
+        }
+
+        if (user && user.id === idToLoad) {
+            document.getElementById('editSection').style.display = 'block';
+        } else if (user) {
+            document.getElementById('chatSection').style.display = 'block';
+            document.getElementById('chatLink').href = `chat.html?to=${idToLoad}`;
+        }
+    }
+
+    async function saveProfile() {
+        const { data: { user } } = await db.auth.getUser();
+        const updates = {
+            id: user.id,
+            username: document.getElementById('inUsername').value,
+            age: document.getElementById('inAge').value,
+            city_country: document.getElementById('inCity').value,
+            favorite_book: document.getElementById('inFav').value,
+            bio: document.getElementById('inBio').value
+        };
+
+        const { error } = await db.from('profiles').upsert(updates);
+        if (error) alert(error.message);
+        else window.location.reload();
+    }
+
+    loadProfile();
+</script>
+</body>
+</html>
