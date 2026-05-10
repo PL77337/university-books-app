@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Katalog Książek</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #f4f4f9; color: #333; margin: 0; padding: 20px; }
+        .container { max-width: 600px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        h1 { font-size: 24px; margin-bottom: 20px; }
+        .form-group { margin-bottom: 15px; }
+        input { width: 100%; padding: 10px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
+        button { background-color: #007bff; color: white; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer; width: 100%; }
+        button:hover { background-color: #0056b3; }
+        .book-list { margin-top: 30px; }
+        .book-item { padding: 10px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; }
+        .book-item:last-child { border-bottom: none; }
+        .book-author { color: #777; font-size: 14px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Dodaj nową książkę</h1>
+    
+    <div class="form-group">
+        <input type="text" id="titleInput" placeholder="Tytuł książki" required>
+    </div>
+    <div class="form-group">
+        <input type="text" id="authorInput" placeholder="Autor" required>
+    </div>
+    <button onclick="addBook()">Zapisz książkę</button>
+
+    <div class="book-list">
+        <h2>Lista książek</h2>
+        <div id="booksContainer">Ładowanie...</div>
+    </div>
+</div>
+
+<script>
+    // Твои данные для подключения к Supabase
+    const supabaseUrl = 'https://ekfjvbncqmoioxmfbrer.supabase.co';
+    const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVrZmp2Ym5jcW1vaW94bWZicmVyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg0MDA4NjQsImV4cCI6MjA5Mzk3Njg2NH0.JHSrgWWkenp8rg2di9TmvIp46XuOASWPs8Gx1rC52Zs';
+    
+    const supabase = supabase.createClient(supabaseUrl, supabaseKey);
+
+    // Функция загрузки книг из базы
+    async function fetchBooks() {
+        const { data, error } = await supabase
+            .from('books')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+        if (error) {
+            console.error('Błąd pobierania:', error);
+            document.getElementById('booksContainer').innerText = 'Błąd ładowania danych. Sprawdź konsolę (F12).';
+            return;
+        }
+
+        const container = document.getElementById('booksContainer');
+        container.innerHTML = ''; 
+
+        if (data.length === 0) {
+            container.innerHTML = '<p>Brak książek w bazie.</p>';
+            return;
+        }
+
+        data.forEach(book => {
+            const div = document.createElement('div');
+            div.className = 'book-item';
+            div.innerHTML = `<strong>${book.title}</strong> <span class="book-author">${book.author}</span>`;
+            container.appendChild(div);
+        });
+    }
+
+    // Функция добавления новой книги
+    async function addBook() {
+        const title = document.getElementById('titleInput').value.trim();
+        const author = document.getElementById('authorInput').value.trim();
+
+        if (!title || !author) {
+            alert('Proszę wypełnić wszystkie pola!');
+            return;
+        }
+
+        const { data, error } = await supabase
+            .from('books')
+            .insert([{ title: title, author: author }]);
+
+        if (error) {
+            console.error('Błąd dodawania:', error);
+            alert('Wystąpił błąd podczas dodawania. Sprawdź konsolę (F12).');
+        } else {
+            document.getElementById('titleInput').value = '';
+            document.getElementById('authorInput').value = '';
+            fetchBooks(); // Обновляем список на экране
+        }
+    }
+
+    // Запускаем загрузку книг при открытии страницы
+    fetchBooks();
+</script>
+
+</body>
+</html>
