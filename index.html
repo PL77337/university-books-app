@@ -11,12 +11,12 @@
 
 <div class="container mt-5">
     <div id="authArea" class="text-end mb-3">
-        <li class="list-inline-item text-muted">Sprawdzanie statusu...</li>
+        <span class="text-muted">Ładowanie statusu...</span>
     </div>
 
     <h1 class="mb-4 text-center">Mój Katalog Książek</h1>
     
-    <div class="card shadow-sm mb-5">
+    <div id="addBookForm" class="card shadow-sm mb-5" style="display: none;">
         <div class="card-body">
             <h5 class="card-title">Dodaj nową książkę</h5>
             <div class="row g-3">
@@ -48,26 +48,28 @@
     const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVrZmp2Ym5jcW1vaW94bWZicmVyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg0MDA4NjQsImV4cCI6MjA5Mzk3Njg2NH0.JHSrgWWkenp8rg2di9TmvIp46XuOASWPs8Gx1rC52Zs';
     const db = supabase.createClient(supabaseUrl, supabaseKey);
 
-    // Функция проверки пользователя
+    // Проверка пользователя и управление формой
     async function checkUser() {
         const { data: { user } } = await db.auth.getUser();
         const authArea = document.getElementById('authArea');
+        const form = document.getElementById('addBookForm');
         
         if (user) {
             authArea.innerHTML = `
-                <span class="me-2 text-dark font-weight-bold">Witaj, <strong>${user.email}</strong></span>
+                <span class="me-2 text-dark">Zalogowany jako: <strong>${user.email}</strong></span>
                 <button onclick="logout()" class="btn btn-sm btn-outline-danger">Wyloguj</button>
             `;
+            form.style.display = 'block'; // Показываем форму авторизованному
             return user;
         } else {
             authArea.innerHTML = `
                 <a href="auth.html" class="btn btn-sm btn-success">Zaloguj się / Rejestracja</a>
             `;
+            form.style.display = 'none'; // Скрываем форму для гостей
             return null;
         }
     }
 
-    // Функция выхода
     async function logout() {
         await db.auth.signOut();
         window.location.reload();
@@ -80,7 +82,7 @@
         container.innerHTML = ''; 
 
         if (error) { 
-            container.innerHTML = '<li class="list-group-item text-danger">Błąd ładowania данных.</li>'; 
+            container.innerHTML = '<li class="list-group-item text-danger">Błąd ładowania danych.</li>'; 
             return; 
         }
         
@@ -93,7 +95,7 @@
             const li = document.createElement('li');
             li.className = 'list-group-item d-flex justify-content-between align-items-center';
             
-            // Кнопка удаления доступна только авторизованным пользователям
+            // Удаление доступно только админу/авторизованному
             const deleteBtn = user ? `<button onclick="deleteBook(${book.id})" class="btn btn-sm btn-outline-danger">Usuń</button>` : '';
 
             li.innerHTML = `
@@ -111,14 +113,11 @@
 
     async function addBook() {
         const user = await checkUser();
-        if (!user) {
-            alert('Musisz być zalogowany, aby dodać książkę!');
-            return;
-        }
+        if (!user) return alert('Musisz być zalogowany!');
 
         const title = document.getElementById('titleInput').value.trim();
         const author = document.getElementById('authorInput').value.trim();
-        if (!title || !author) return alert('Proszę wypełnić wszystkie pola!');
+        if (!title || !author) return alert('Wypełnij pola!');
 
         const { error } = await db.from('books').insert([{ title, author }]);
         if (!error) {
@@ -126,21 +125,14 @@
             document.getElementById('authorInput').value = '';
             fetchBooks();
         } else {
-            alert('Wystąpił błąd podczas dodawania.');
+            alert('Błąd dodawania.');
         }
     }
 
     async function deleteBook(id) {
-        const user = await checkUser();
-        if (!user) return alert('Brak uprawnień!');
-
-        if (!confirm('Na pewno chcesz usunąć tę książkę?')) return;
+        if (!confirm('Na pewno chcesz usunąć?')) return;
         const { error } = await db.from('books').delete().eq('id', id);
-        if (!error) {
-            fetchBooks();
-        } else {
-            console.error('Delete error:', error);
-        }
+        if (!error) fetchBooks();
     }
 
     fetchBooks();
